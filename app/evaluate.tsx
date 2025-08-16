@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
+  Clipboard,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -11,7 +13,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { OPENAI_API_KEY } from '../components/openai_api_key';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { OPENAI_API_KEY } from '../components/openai';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -60,9 +63,49 @@ export default function EvaluateScreen() {
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error(error);
+      Alert.alert('Error', 'Failed to get a response.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async (msg: Message) => {
+    setLoading(true);
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are an argument evaluation coach for students. When a user inputs an argument, give polite, clear, bullet-pointed feedback on clarity, logic, persuasiveness, and tone.',
+            },
+            msg,
+          ],
+          temperature: 0.7,
+        }),
+      });
+
+      const data = await res.json();
+      const reply = data.choices?.[0]?.message?.content;
+      const assistantMessage: Message = { role: 'assistant', content: reply || 'Error.' };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopy = (text: string) => {
+    Clipboard.setString(text);
+    Alert.alert('Copied', 'Message copied to clipboard.');
   };
 
   useEffect(() => {
@@ -85,10 +128,9 @@ export default function EvaluateScreen() {
           >
             {messages.length === 0 && !loading && (
               <View style={styles.welcomeCard}>
-                <Text style={styles.welcomeIcon}>💬</Text>
                 <Text style={styles.welcomeTitle}>Start a Conversation</Text>
                 <Text style={styles.welcomeSubtitle}>
-                  Type an argument below and get AI-powered feedback with bullet points.
+                  Type an argument below and get AI-powered feedback.
                 </Text>
               </View>
             )}
@@ -99,29 +141,35 @@ export default function EvaluateScreen() {
                 style={[styles.bubble, msg.role === 'user' ? styles.user : styles.assistant]}
               >
                 <Text style={styles.bubbleText}>{msg.content}</Text>
+                {msg.role === 'assistant' && (
+                  <View style={styles.actions}>
+                    <TouchableOpacity onPress={() => handleCopy(msg.content)}>
+                      <Icon name="copy-outline" size={15} color="#555" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleRefresh(messages[index - 1])}>
+                      <Icon name="refresh-outline" size={15} color="#555" style={{ marginLeft: 10 }} />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             ))}
 
             {loading && (
               <View style={[styles.bubble, styles.assistant]}>
-                <Text style={styles.bubbleText}>✍️ Thinking...</Text>
+                <Text style={styles.bubbleText}>Thinking...</Text>
               </View>
             )}
           </ScrollView>
 
           <View style={styles.inputContainer}>
             <TextInput
-              placeholder="Type your argument here..."
+              placeholder="Type your argument..."
               value={input}
               onChangeText={setInput}
               style={styles.input}
               multiline
             />
-            <TouchableOpacity
-              style={styles.sendButton}
-              onPress={handleSend}
-              disabled={loading}
-            >
+            <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled={loading}>
               <Text style={styles.sendText}>Send</Text>
             </TouchableOpacity>
           </View>
@@ -132,22 +180,10 @@ export default function EvaluateScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fffefc',
-  },
-  inner: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  chat: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  chatContent: {
-    paddingBottom: 16,
-  },
+  container: { flex: 1, backgroundColor: '#fffefc' },
+  inner: { flex: 1, justifyContent: 'space-between' },
+  chat: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+  chatContent: { paddingBottom: 16 },
   bubble: {
     padding: 12,
     borderRadius: 12,
@@ -166,12 +202,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
   },
+  actions: {
+    flexDirection: 'row',
+    marginTop: 10,
+  },
   inputContainer: {
     flexDirection: 'row',
     padding: 12,
     borderTopWidth: 1,
     borderColor: '#ddd',
-    alignItems: 'flex-end',
     backgroundColor: '#fff',
   },
   input: {
@@ -196,16 +235,11 @@ const styles = StyleSheet.create({
   welcomeCard: {
     marginTop: 80,
     padding: 24,
-    backgroundColor: 'rgba(253, 238, 141, 0.2)',
+    backgroundColor: '#fff8c6',
     borderRadius: 16,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(253, 238, 141, 0.5)',
-    marginHorizontal: 20,
-  },
-  welcomeIcon: {
-    fontSize: 36,
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#f1e491',
   },
   welcomeTitle: {
     fontSize: 18,
