@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Audio } from 'expo-av';
 import {
   Alert,
   Clipboard,
@@ -14,7 +15,7 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { OPENAI_API_KEY } from '../components/openai';
+import { OPENAI_API_KEY } from '../components/openai_api_key';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -26,6 +27,10 @@ export default function EvaluateScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  // recording usestates
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -107,6 +112,61 @@ export default function EvaluateScreen() {
     Clipboard.setString(text);
     Alert.alert('Copied', 'Message copied to clipboard.');
   };
+
+  const startRecording = async () => {
+    try {
+      const { granted } = await Audio.requestPermissionsAsync();
+      if (!granted) {
+        Alert.alert('Premission required', 'Micophone permission is needed to record.');
+        return;
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const newRecording = new Audio.Recording();
+      await newRecording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await newRecording.startAsync();
+
+      setRecording(newRecording);
+      setIsRecording(true);
+
+    } catch (err) {
+      console.error('Failed to start recording: ', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setIsRecording(false);
+
+      if (uri) {
+        await handleTranscription(uri);
+      }
+    } catch (err) {
+      console.error('Failed to stop recording: ', err);
+      setIsRecording(false);
+    }
+  };
+
+  const handleTranscription = async (uri: string) => {
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      formData.append('file', {
+        uri,
+        name: 'audio.m4a',
+        type: 'audio/m4a',
+      } as any);
+      formData.append('model', 'whisper-1');
+
+      
+    }
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
