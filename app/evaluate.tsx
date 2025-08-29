@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+// import audio module 
 import { Audio } from 'expo-av';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Clipboard,
@@ -23,14 +24,119 @@ interface Message {
 }
 
 export default function EvaluateScreen() {
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const [input, setInput] = useState(''); // For typed text input
+  const [messages, setMessages] = useState<Message[]>([]); // Chat history
+  const [loading, setLoading] = useState(false); // Show loading bubble
+  const [recording, setRecording] = useState<Audio.Recording | null>(null); // Active recording object
+  const [isRecording, setIsRecording] = useState(false); // Show recording status
+  const scrollRef = useRef<ScrollView>(null); // For auto-scroll to bottom
 
-  // recording usestates
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
+  const startRecording = async () => {
+    try {
+      // add mic permission
+      const { granted } = await Audio.requestPermissionsAsync();
+      if (!granted) {
+        Alert.alert('Permission required', 'Microphone permission is needed to record.');
+        return;
+      }
+
+         // Enable recording settings
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      // Initialize recording
+      const newRecording = new Audio.Recording();
+      await newRecording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await newRecording.startAsync();
+      setRecording(newRecording);
+      setIsRecording(true); // 🔴 show animation
+    } catch (err) {
+      console.error('Failed to start recording:', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+
+      await recording.stopAndUnloadAsync(); // stop recording
+      const uri = recording.getURI(); // get file path
+      setRecording(null);
+      setIsRecording(false); // 🔴 hide animation
+
+      if (uri) {
+        await handleTranscription(uri); // send to whisper API
+      }
+    } catch (err) {
+      console.error('Failed to stop recording:', err);
+      setIsRecording(false);
+    }
+  };
+
+  const handleTranscription = async (uri: string) => {
+    try {
+      setLoading(true);
+
+      // prepare file for whisper API transcription
+      const formData = new FormData();
+      formData.append('file', {
+        uri,
+        name: 'audio.m4a',
+        type: 'audio/m4a',
+      } as any);
+      formData.append('model', 'whisper-1');
+
+      // whisper API
+      const transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+
+      const transcriptionData = await transcriptionResponse.json();
+      const transcribedText = transcriptionData.text;
+
+      // Step 2: Show summary: "I heard..."
+      const summary = `I heard: "${transcribedText}"`;
+
+      // step 1: add user transcribed voices as user message 
+      setMessages((prev) => [...prev, { role: 'assistant', content: summary }]);
+
+      // Step 3: Evaluate transcript
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are an argument evaluation coach for students. When a user inputs an argument, give polite, clear, bullet-pointed feedback on clarity, logic, persuasiveness, and tone.',
+            },
+            { role: 'user', content: transcribedText },
+          ],
+          temperature: 0.7,
+        }),
+      });
+
+      const data = await response.json();
+      const reply = data.choices?.[0]?.message?.content;
+      setMessages((prev) => [...prev, { role: 'assistant', content: reply || 'Error.' }]);
+    } catch (error) {
+      console.error('Transcription or evaluation failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -74,6 +180,11 @@ export default function EvaluateScreen() {
     }
   };
 
+  const handleCopy = (text: string) => {
+    Clipboard.setString(text);
+    Alert.alert('Copied', 'Message copied to clipboard.');
+  };
+
   const handleRefresh = async (msg: Message) => {
     setLoading(true);
     try {
@@ -108,66 +219,6 @@ export default function EvaluateScreen() {
     }
   };
 
-  const handleCopy = (text: string) => {
-    Clipboard.setString(text);
-    Alert.alert('Copied', 'Message copied to clipboard.');
-  };
-
-  const startRecording = async () => {
-    try {
-      const { granted } = await Audio.requestPermissionsAsync();
-      if (!granted) {
-        Alert.alert('Premission required', 'Micophone permission is needed to record.');
-        return;
-      }
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-      const newRecording = new Audio.Recording();
-      await newRecording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await newRecording.startAsync();
-
-      setRecording(newRecording);
-      setIsRecording(true);
-
-    } catch (err) {
-      console.error('Failed to start recording: ', err);
-    }
-  };
-
-  const stopRecording = async () => {
-    try {
-      if (!recording) return;
-
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setIsRecording(false);
-
-      if (uri) {
-        await handleTranscription(uri);
-      }
-    } catch (err) {
-      console.error('Failed to stop recording: ', err);
-      setIsRecording(false);
-    }
-  };
-
-  const handleTranscription = async (uri: string) => {
-    try {
-      setLoading(true);
-      const formData = new FormData();
-      formData.append('file', {
-        uri,
-        name: 'audio.m4a',
-        type: 'audio/m4a',
-      } as any);
-      formData.append('model', 'whisper-1');
-
-      
-    }
-  }
-
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages, loading]);
@@ -190,7 +241,7 @@ export default function EvaluateScreen() {
               <View style={styles.welcomeCard}>
                 <Text style={styles.welcomeTitle}>Start a Conversation</Text>
                 <Text style={styles.welcomeSubtitle}>
-                  Type an argument below and get AI-powered feedback.
+                  Type or speak an argument and get AI-powered feedback.
                 </Text>
               </View>
             )}
@@ -221,6 +272,13 @@ export default function EvaluateScreen() {
             )}
           </ScrollView>
 
+          {/* 🔴 Recording Indicator */}
+          {isRecording && (
+            <View style={{ alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ color: 'red', fontWeight: 'bold' }}>🎙️ Recording...</Text>
+            </View>
+          )}
+
           <View style={styles.inputContainer}>
             <TextInput
               placeholder="Type your argument..."
@@ -231,6 +289,15 @@ export default function EvaluateScreen() {
             />
             <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled={loading}>
               <Text style={styles.sendText}>Send</Text>
+            </TouchableOpacity>
+
+            {/* mic button */}
+            <TouchableOpacity
+              style={styles.micButton}
+              onPressIn={startRecording} // start recording on press
+              onPressOut={stopRecording} // stop on release button
+            >
+              <Icon name="mic-outline" size={24} color="#333" />
             </TouchableOpacity>
           </View>
         </View>
@@ -262,16 +329,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
   },
-  actions: {
-    flexDirection: 'row',
-    marginTop: 10,
-  },
   inputContainer: {
     flexDirection: 'row',
     padding: 12,
     borderTopWidth: 1,
     borderColor: '#ddd',
     backgroundColor: '#fff',
+    alignItems: 'center',
   },
   input: {
     flex: 1,
@@ -292,6 +356,10 @@ const styles = StyleSheet.create({
   sendText: {
     fontWeight: 'bold',
   },
+  micButton: {
+    marginLeft: 10,
+    padding: 10,
+  },
   welcomeCard: {
     marginTop: 80,
     padding: 24,
@@ -310,5 +378,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     color: '#555',
+  },
+  actions: {
+    flexDirection: 'row',
+    marginTop: 10,
   },
 });
