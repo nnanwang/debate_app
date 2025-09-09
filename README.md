@@ -1,16 +1,80 @@
-# Welcome to your Expo app 👋
+# SpeakUp: Your AI-Powered Debate Coach
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**SpeakUp** is a comprehensive debate app designed to help debaters—especially students—improve their logical reasoning and argumentation skills through fun, interactive AI features.
 
-## Get started
+## 🎯 Purpose
+- It’s hard to get instant feedback from a spectator or judge unless you carry one
+around in your backpack. That’s really only possible through debate tournaments.
+Well, now you don’t have to go to debate tournaments to get feedback! Use
+SpeakUp and be able to get high quality feedback from AI that explains how you can
+improve your argument and logical skills through fun games!
+- Learn logical skills to use in real life situations, not just in debate. Logical abilities
+can be really important in real life.
+
+---
+## 🌟 Features
+
+### 🎙️ Voice-Based Argument Evaluation
+
+- Long-press the mic icon to record your argument.
+- AI transcribes your voice using **OpenAI's Whisper API**.
+- The app summarizes your argument and gives feedback powered by **GPT-4o**.
+
+### 🎮 Logic Game Mode
+
+- Play a game where GPT generates silly or funny questions.
+- Learn how to identify logical flaws and sharpen reasoning skills.
+- Each round includes 5 questions with score tracking.
+
+### 📝 Chat-Based Feedback
+
+- Get real-time feedback from AI in a chat format.
+- Each message includes a **copy** button and **refresh** option to regenerate AI responses.
+
+---
+
+## 🧠 What Makes SpeakUp Different
+- Unlike traditional tools that rely on judges or lectures, SpeakUp gives **personalized**, **real-time**, and **interactive** feedback anytime.
+- Kids and teens stay engaged with logic games instead of boring text or videos.
+- Built-in recording and feedback means **no more incomplete ballots** or long waits for evaluation.
+
+---
+
+## 📈 Results
+
+- Be more prepared for debate tournaments or real-life arguments.
+- Build **confidence**, **clarity**, and **persuasiveness**.
+- Improve logic **while having fun**!
+
+---
+
+## 🛠️ Tech Stack
+
+| Component       | Technology                    |
+| --------------- | ----------------------------- |
+| Frontend        | React Native (Expo)           |
+| Voice Recording | `expo-av`, `expo-file-system` |
+| AI Integration  | OpenAI Whisper API + GPT-3.5 turbo API   |
+| Styling         | React Native StyleSheet       |
+| Icons           | `react-native-vector-icons`   |
+
+---
+
+## ⚙️ Setup Instructions
 
 1. Install dependencies
 
    ```bash
    npm install
    ```
+2. Set up your OpenAI API key
+Create openai_api_key.ts file in the component folder
+Put your key in the file:
+   ```
+   export const OPENAI_API_KEY ='<Your OpenAI API Key>'
+   ```
 
-2. Start the app
+3. Start the app
 
    ```bash
    npx expo start
@@ -25,26 +89,34 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-## Get a fresh project
+## Project Structure
 
-When you're ready, run:
-
-```bash
-npm run reset-project
 ```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+.
+├── app
+│   ├── _layout.tsx
+│   ├── (tabs)
+│   ├── +not-found.tsx
+│   ├── debate.tsx
+│   ├── evaluate_new.tsx
+│   ├── evaluate.tsx
+│   ├── game.tsx
+│   └── gameOLD.tsx
+├── app.json
+├── assets
+│   ├── fonts
+│   └── images
+├── components
+│   └── openai.ts
+├── eslint.config.js
+├── expo-env.d.ts
+├── ios
+│   ├── debateapppre
+│   ├── debateapppre.xcodeproj
+│   ├── Podfile
+│   └── Podfile.properties.json
+├── package-lock.json
+├── package.json
+├── README.md
+└── tsconfig.json
+```
